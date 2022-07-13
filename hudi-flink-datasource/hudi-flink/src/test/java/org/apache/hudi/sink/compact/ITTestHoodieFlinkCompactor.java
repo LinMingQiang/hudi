@@ -301,10 +301,10 @@ public class ITTestHoodieFlinkCompactor {
     tableEnv.executeSql(hoodieTableDDL);
     tableEnv.executeSql(TestSQL.INSERT_T1).await();
     tableEnv.executeSql(TestSQL.UPDATE_INSERT_T1).await();
-    Map<String, List<String>> EXPECTED = compactionOnBatchModeEnable? EXPECTED2 : new HashMap<>();
+    Map<String, List<String>> expected = compactionOnBatchModeEnable ? EXPECTED2 : new HashMap<>();
     // wait for the asynchronous commit to finish
     TimeUnit.SECONDS.sleep(3);
-    TestData.checkWrittenDataCOW(tempFile, EXPECTED);
+    TestData.checkWrittenDataCOW(tempFile, expected);
   }
 
   private String scheduleCompactionPlan(HoodieTableMetaClient metaClient, HoodieFlinkWriteClient<?> writeClient) {
