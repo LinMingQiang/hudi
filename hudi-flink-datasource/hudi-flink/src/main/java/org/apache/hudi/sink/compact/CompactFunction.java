@@ -62,6 +62,11 @@ public class CompactFunction extends ProcessFunction<CompactionPlanEvent, Compac
   private final boolean asyncCompaction;
 
   /**
+   * Whether to execute compaction in batch mode write.
+   */
+  private final boolean batchModeCompaction;
+
+  /**
    * Id of current subtask.
    */
   private int taskID;
@@ -74,6 +79,7 @@ public class CompactFunction extends ProcessFunction<CompactionPlanEvent, Compac
   public CompactFunction(Configuration conf) {
     this.conf = conf;
     this.asyncCompaction = OptionsResolver.needsAsyncCompaction(conf);
+    this.batchModeCompaction = OptionsResolver.needsScheduleCompactionInBatchMode(conf);
   }
 
   @Override
@@ -89,7 +95,8 @@ public class CompactFunction extends ProcessFunction<CompactionPlanEvent, Compac
   public void processElement(CompactionPlanEvent event, Context context, Collector<CompactionCommitEvent> collector) throws Exception {
     final String instantTime = event.getCompactionInstantTime();
     final CompactionOperation compactionOperation = event.getOperation();
-    if (asyncCompaction) {
+    // batch mode write must use syncCompaction.
+    if (asyncCompaction && !batchModeCompaction) {
       // executes the compaction task asynchronously to not block the checkpoint barrier propagate.
       executor.execute(
           () -> doCompaction(instantTime, compactionOperation, collector, reloadWriteConfig()),

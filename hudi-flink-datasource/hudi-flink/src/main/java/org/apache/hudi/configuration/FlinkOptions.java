@@ -496,6 +496,12 @@ public class FlinkOptions extends HoodieConfig {
   //  Compaction Options
   // ------------------------------------------------------------------------
 
+  public static final ConfigOption<Boolean> COMPACTION_BATCH_MODE_ENABLED = ConfigOptions
+          .key("compaction.batch.mode.enabled")
+          .booleanType()
+          .defaultValue(false) // default false for MOR write
+          .withDescription("Schedule the compaction plan on batch mode, default false");
+
   public static final ConfigOption<Boolean> COMPACTION_SCHEDULE_ENABLED = ConfigOptions
       .key("compaction.schedule.enabled")
       .booleanType()

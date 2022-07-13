@@ -131,6 +131,16 @@ public class OptionsResolver {
   }
 
   /**
+   * Returns whether there is need to schedule the compaction plan in batch mode write.
+   *
+   * @param conf The flink configuration.
+   */
+  public static boolean needsScheduleCompactionInBatchMode(Configuration conf) {
+    return OptionsResolver.isMorTable(conf)
+            && conf.getBoolean(FlinkOptions.COMPACTION_BATCH_MODE_ENABLED);
+  }
+
+  /**
    * Returns whether there is need to schedule the compaction plan.
    *
    * @param conf The flink configuration.
