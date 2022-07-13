@@ -296,7 +296,7 @@ public class ITTestHoodieFlinkCompactor {
     options.put(FlinkOptions.COMPACTION_DELTA_COMMITS.key(), "2");
     options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
     options.put(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
-    options.put(FlinkOptions.COMPACTION_BATCH_MODE_ENABLED.key(), String.valueOf(compactionOnBatchModeEnable));
+    options.put(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key(), String.valueOf(compactionOnBatchModeEnable));
     String hoodieTableDDL = TestConfigurations.getCreateHoodieTableDDL("t1", options);
     tableEnv.executeSql(hoodieTableDDL);
     tableEnv.executeSql(TestSQL.INSERT_T1).await();

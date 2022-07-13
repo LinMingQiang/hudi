@@ -428,19 +428,17 @@ public class StreamWriteOperatorCoordinator
     addEventToBuffer(event);
     if (allEventsReceived()) {
       // start to commit the instant.
-      boolean committed = commitInstant(this.instant);
-      if (committed) {
-        // The executor thread inherits the classloader of the #handleEventFromOperator
-        // caller, which is a AppClassLoader.
-        Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
-        // sync Hive synchronously if it is enabled in batch mode.
-        syncHive();
-        // when we are batch write to hoodie, this can do compaction online.
-        if (tableState.scheduleCompaction && tableState.scheduleCompactionInBatchMode) {
-          LOG.info("scheduleCompaction for batch mode write !");
-          // if async compaction is on, schedule the compaction
-          CompactionUtil.scheduleCompaction(metaClient, writeClient, tableState.isDeltaTimeCompaction, committed);
-        }
+      boolean committed = commitInstant(this.instant, -1);
+      // The executor thread inherits the classloader of the #handleEventFromOperator
+      // caller, which is a AppClassLoader.
+      Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+      // sync Hive synchronously if it is enabled in batch mode.
+      syncHive();
+      // when we are batch write to hoodie, this can do compaction online.
+      if (tableState.scheduleCompaction && tableState.scheduleCompactionInBatchMode) {
+        LOG.info("scheduleCompaction for batch mode write !");
+        // if async compaction is on, schedule the compaction
+        CompactionUtil.scheduleCompaction(metaClient, writeClient, tableState.isDeltaTimeCompaction, committed);
       }
     }
   }
@@ -625,6 +623,7 @@ public class StreamWriteOperatorCoordinator
     final boolean isOverwrite;
     final boolean scheduleCompaction;
     final boolean scheduleClustering;
+    final boolean scheduleCompactionInBatchMode;
     final boolean syncHive;
     final boolean syncMetadata;
     final boolean isDeltaTimeCompaction;
@@ -636,6 +635,7 @@ public class StreamWriteOperatorCoordinator
       this.isOverwrite = WriteOperationType.isOverwrite(this.operationType);
       this.scheduleCompaction = OptionsResolver.needsScheduleCompaction(conf);
       this.scheduleClustering = OptionsResolver.needsScheduleClustering(conf);
+      this.scheduleCompactionInBatchMode = OptionsResolver.needsScheduleCompactionInBatchMode(conf);
       this.syncHive = conf.getBoolean(FlinkOptions.HIVE_SYNC_ENABLED);
       this.syncMetadata = conf.getBoolean(FlinkOptions.METADATA_ENABLED);
       this.isDeltaTimeCompaction = OptionsResolver.isDeltaTimeCompaction(conf);
