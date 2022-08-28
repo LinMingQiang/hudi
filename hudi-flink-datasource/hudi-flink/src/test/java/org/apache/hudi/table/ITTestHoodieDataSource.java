@@ -1198,7 +1198,7 @@ public class ITTestHoodieDataSource extends AbstractTestBase {
 
     List<Row> result = CollectionUtil.iterableToList(
         () -> tableEnv.sqlQuery("select * from t1").execute().collect());
-    assertRowsEquals(result, TestData.dataSetInsert(3, 4, 5, 6, 7, 8, 9, 10,
+    assertRowsEquals(result, TestData.dataSetInsert(1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
         11, 12, 13, 14, 15, 16, 17, 18, 19, 20));
   }
 

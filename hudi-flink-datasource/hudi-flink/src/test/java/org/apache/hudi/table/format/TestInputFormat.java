@@ -18,6 +18,7 @@
 
 package org.apache.hudi.table.format;
 
+import org.apache.flink.api.java.io.CollectionInputFormat;
 import org.apache.hudi.client.HoodieFlinkWriteClient;
 import org.apache.hudi.client.common.HoodieFlinkEngineContext;
 import org.apache.hudi.common.model.EventTimeAvroPayload;
@@ -449,7 +450,7 @@ public class TestInputFormat {
     assertThat(inputFormat4, instanceOf(MergeOnReadInputFormat.class));
 
     List<RowData> actual4 = readData(inputFormat4);
-    final List<RowData> expected4 = TestData.dataSetInsert(3, 4);
+    final List<RowData> expected4 = TestData.dataSetInsert(1, 2, 3, 4);
     TestData.assertRowDataEquals(actual4, expected4);
 
     // start and end commit: start commit out of range
@@ -468,7 +469,7 @@ public class TestInputFormat {
     conf.setString(FlinkOptions.READ_END_COMMIT, "002");
     this.tableSource = getTableSource(conf);
     InputFormat<RowData, ?> inputFormat6 = this.tableSource.getInputFormat();
-    assertThat(inputFormat6, instanceOf(MergeOnReadInputFormat.class));
+    assertThat(inputFormat6, instanceOf(CollectionInputFormat.class));
 
     List<RowData> actual6 = readData(inputFormat6);
     TestData.assertRowDataEquals(actual6, Collections.emptyList());
