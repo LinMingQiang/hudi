@@ -128,12 +128,13 @@ public class IncrementalInputSplits implements Serializable {
       return Result.EMPTY;
     }
 
-    final String startCommit = this.conf.getString(FlinkOptions.READ_START_COMMIT);
+    // The value may be 'earliest' or Null or outOfRange.
+    final String startCommit = this.conf.getString(FlinkOptions.READ_START_COMMIT, FlinkOptions.START_COMMIT_EARLIEST);
     final String endCommit = this.conf.getString(FlinkOptions.READ_END_COMMIT);
-    final boolean startFromEarliest = FlinkOptions.START_COMMIT_EARLIEST.equalsIgnoreCase(startCommit);
-    final boolean startOutOfRange = startCommit != null && commitTimeline.isBeforeTimelineStarts(startCommit);
-    final boolean endOutOfRange = endCommit != null && commitTimeline.isBeforeTimelineStarts(endCommit);
-    boolean fullTableScan = startFromEarliest || startOutOfRange || endOutOfRange;
+    final boolean startFromEarliest = FlinkOptions.START_COMMIT_EARLIEST.equalsIgnoreCase(startCommit) || commitTimeline.isBeforeTimelineStarts(startCommit);
+    // If endCommit is null, the default is read to the latest.
+    final boolean endToLatest = endCommit == null;
+    boolean fullTableScan = startFromEarliest && endToLatest;
 
     // Step1: find out the files to read, tries to read the files from the commit metadata first,
     // fallback to full table scan if any of the following conditions matches:
@@ -193,20 +194,17 @@ public class IncrementalInputSplits implements Serializable {
     // Step2: generates the instant range
     // if the specified end commit is archived, still uses the specified timestamp,
     // else uses the latest filtered instant time
-    // (would be the latest instant time if the specified end commit is greater than the latest instant time)
-    final String rangeEnd = endOutOfRange ? endCommit : instants.get(instants.size() - 1).getTimestamp();
-    // keep the same semantics with streaming read, default start from the latest commit
-    final String rangeStart = startFromEarliest ? null : (startCommit == null ? rangeEnd : startCommit);
     final InstantRange instantRange;
-    if (!fullTableScan) {
-      instantRange = InstantRange.builder().startInstant(rangeStart).endInstant(rangeEnd)
-          .rangeType(InstantRange.RangeType.CLOSE_CLOSE).build();
-    } else if (startFromEarliest && endCommit == null) {
+    if (fullTableScan) {
       // short-cut for snapshot read
       instantRange = null;
     } else {
+      // (would be the latest instant time if the specified end commit is greater than the latest instant time)
+      final String rangeEnd = endToLatest ? null : instants.get(instants.size() - 1).getTimestamp();
+      // keep the same semantics with streaming read, default start from the earliest commit
+      final String rangeStart = startFromEarliest ? null : startCommit;
       instantRange = InstantRange.builder().startInstant(rangeStart).endInstant(rangeEnd)
-          .rangeType(InstantRange.RangeType.CLOSE_CLOSE).nullableBoundary(true).build();
+              .rangeType(InstantRange.RangeType.CLOSE_CLOSE).nullableBoundary(endToLatest || startFromEarliest).build();
     }
 
     // Step3: decides the read end commit
