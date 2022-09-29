@@ -52,6 +52,7 @@ import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SKIP_RO_SUFFIX_FOR_
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SUPPORT_TIMESTAMP_TYPE;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SYNC_AS_DATA_SOURCE_TABLE;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SYNC_COMMENT;
+import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SYNC_ONLY_RO_OR_RT;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SYNC_SCHEMA_STRING_LENGTH_THRESHOLD;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_TABLE_PROPERTIES;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_TABLE_SERDE_PROPERTIES;
@@ -87,6 +88,8 @@ public class HiveSyncTool extends HoodieSyncTool implements AutoCloseable {
   protected String snapshotTableName;
   protected Option<String> roTableName;
 
+  protected String onlySyncRoOrRt;
+
   public HiveSyncTool(Properties props, Configuration hadoopConf) {
     super(props, hadoopConf);
     HiveSyncConfig config = new HiveSyncConfig(props, hadoopConf);
@@ -118,6 +121,7 @@ public class HiveSyncTool extends HoodieSyncTool implements AutoCloseable {
           this.roTableName = Option.empty();
           break;
         case MERGE_ON_READ:
+          this.onlySyncRoOrRt = config.getString(HIVE_SYNC_ONLY_RO_OR_RT).toUpperCase();
           this.snapshotTableName = tableName + SUFFIX_SNAPSHOT_TABLE;
           this.roTableName = config.getBoolean(HIVE_SKIP_RO_SUFFIX_FOR_READ_OPTIMIZED_TABLE)
               ? Option.of(tableName)
@@ -154,10 +158,21 @@ public class HiveSyncTool extends HoodieSyncTool implements AutoCloseable {
         syncHoodieTable(snapshotTableName, false, false);
         break;
       case MERGE_ON_READ:
-        // sync a RO table for MOR
-        syncHoodieTable(roTableName.get(), false, true);
-        // sync a RT table for MOR
-        syncHoodieTable(snapshotTableName, true, false);
+        switch (onlySyncRoOrRt) {
+          case "RO" :
+            // sync a RO table for MOR
+            syncHoodieTable(tableName, false, true);
+            break;
+          case "RT" :
+            // sync a RT table for MOR
+            syncHoodieTable(tableName, true, false);
+            break;
+          default:
+            // sync a RO table for MOR
+            syncHoodieTable(roTableName.get(), false, true);
+            // sync a RT table for MOR
+            syncHoodieTable(snapshotTableName, true, false);
+        }
         break;
       default:
         LOG.error("Unknown table type " + syncClient.getTableType());

@@ -824,6 +824,12 @@ public class FlinkOptions extends HoodieConfig {
       .noDefaultValue()
       .withDescription("The hive configuration directory, where the hive-site.xml lies in, the file should be put on the client machine");
 
+  public static final ConfigOption<String> HIVE_SYNC_ONLY_RO_OR_RT = ConfigOptions
+          .key("hive_sync.table.ro_or_rt")
+          .stringType()
+          .defaultValue("")
+          .withDescription("Only sync read optimized table or realtime table.");
+
   // -------------------------------------------------------------------------
   //  Utilities
   // -------------------------------------------------------------------------

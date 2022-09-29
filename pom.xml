@@ -1693,6 +1693,7 @@
               <skip>${skipFTs}</skip>
               <forkCount>1</forkCount>
               <reuseForks>true</reuseForks>
+              <argLine>-Xmx1024m -XX:MaxPermSize=256m</argLine>
               <includes>
                 <include>**/*FunctionalTestSuite.java</include>
               </includes>

@@ -105,7 +105,7 @@ public class ITTestHoodieFlinkCompactor {
     Map<String, String> options = new HashMap<>();
     options.put(FlinkOptions.COMPACTION_SCHEDULE_ENABLED.key(), "false");
     options.put(FlinkOptions.COMPACTION_ASYNC_ENABLED.key(), "false");
-    options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
+    options.put(FlinkOptions.PATH.key(), "file://"+tempFile.getAbsolutePath());
     options.put(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
     options.put(FlinkOptions.CHANGELOG_ENABLED.key(), enableChangelog + "");
     String hoodieTableDDL = TestConfigurations.getCreateHoodieTableDDL("t1", options);
@@ -118,7 +118,7 @@ public class ITTestHoodieFlinkCompactor {
     // Make configuration and setAvroSchema.
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
     FlinkCompactionConfig cfg = new FlinkCompactionConfig();
-    cfg.path = tempFile.getAbsolutePath();
+    cfg.path = "file://"+tempFile.getAbsolutePath();
     Configuration conf = FlinkCompactionConfig.toFlinkConfig(cfg);
     conf.setString(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
 
@@ -176,7 +176,7 @@ public class ITTestHoodieFlinkCompactor {
         .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
     Map<String, String> options = new HashMap<>();
     options.put(FlinkOptions.COMPACTION_ASYNC_ENABLED.key(), "false");
-    options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
+    options.put(FlinkOptions.PATH.key(), "file://"+tempFile.getAbsolutePath());
     options.put(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
     options.put(FlinkOptions.CHANGELOG_ENABLED.key(), enableChangelog + "");
     String hoodieTableDDL = TestConfigurations.getCreateHoodieTableDDL("t1", options);
@@ -190,7 +190,7 @@ public class ITTestHoodieFlinkCompactor {
     // Make configuration and setAvroSchema.
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
     FlinkCompactionConfig cfg = new FlinkCompactionConfig();
-    cfg.path = tempFile.getAbsolutePath();
+    cfg.path = "file://"+tempFile.getAbsolutePath();
     cfg.minCompactionIntervalSeconds = 3;
     cfg.schedule = true;
     Configuration conf = FlinkCompactionConfig.toFlinkConfig(cfg);
@@ -217,7 +217,7 @@ public class ITTestHoodieFlinkCompactor {
         .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
     Map<String, String> options = new HashMap<>();
     options.put(FlinkOptions.COMPACTION_ASYNC_ENABLED.key(), "false");
-    options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
+    options.put(FlinkOptions.PATH.key(), "file://"+tempFile.getAbsolutePath());
     options.put(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
     options.put(FlinkOptions.CHANGELOG_ENABLED.key(), enableChangelog + "");
     String hoodieTableDDL = TestConfigurations.getCreateHoodieTableDDL("t1", options);
@@ -226,7 +226,7 @@ public class ITTestHoodieFlinkCompactor {
 
     StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
     FlinkCompactionConfig cfg = new FlinkCompactionConfig();
-    cfg.path = tempFile.getAbsolutePath();
+    cfg.path = "file://"+tempFile.getAbsolutePath();
     Configuration conf = FlinkCompactionConfig.toFlinkConfig(cfg);
     conf.setString(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
 
@@ -297,7 +297,7 @@ public class ITTestHoodieFlinkCompactor {
         .setInteger(ExecutionConfigOptions.TABLE_EXEC_RESOURCE_DEFAULT_PARALLELISM, 4);
     Map<String, String> options = new HashMap<>();
     options.put(FlinkOptions.COMPACTION_DELTA_COMMITS.key(), "2");
-    options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
+    options.put(FlinkOptions.PATH.key(), "file://"+tempFile.getAbsolutePath());
     options.put(FlinkOptions.TABLE_TYPE.key(), "MERGE_ON_READ");
     String hoodieTableDDL = TestConfigurations.getCreateHoodieTableDDL("t1", options);
     tableEnv.executeSql(hoodieTableDDL);

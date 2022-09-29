@@ -2,6 +2,8 @@ package com.vip.hudi.flink.mor.test;
 
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.Schema;
+import org.apache.flink.table.api.Table;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
@@ -24,7 +26,7 @@ import static junit.framework.TestCase.assertEquals;
 /**
  * 主要测试changelog的场景，例如flink 聚合结果输出，mysql的cdc数据等.
  */
-public class ITTestChangelogWrite extends TestUtil{
+public class ITTestChangelogWrite extends TestUtil {
     String pathName = "ITTestChangelogWrite";
     public static final DataType ROW_DATA_TYPE = DataTypes.ROW(
                     DataTypes.FIELD("id", DataTypes.VARCHAR(20)),// record key
@@ -33,61 +35,60 @@ public class ITTestChangelogWrite extends TestUtil{
                     DataTypes.FIELD("rowtime", DataTypes.TIMESTAMP(3)), // precombine field
                     DataTypes.FIELD("dt", DataTypes.VARCHAR(10)))
             .notNull();
+
     @Test
     public void testWrite() throws Exception {
-        init(RuntimeExecutionMode.BATCH);
+        init(RuntimeExecutionMode.STREAMING);
+        tableEnv.getConfig().set("table.exec.sink.upsert-materialize","none");
         tableEnv.executeSql(FILE_SRC_HUDI_TBL(pathName));
-
-        Row ins = Row.ofKind(RowKind.UPDATE_AFTER, StringData.fromString("id1"),
-                StringData.fromString("Danny"), 24,
-                TimestampData.fromEpochMillis(1),
-                StringData.fromString("par1"));
-//        BinaryRowData ins = insertRow((RowType)ROW_DATA_TYPE.getLogicalType(),
-//                StringData.fromString("id1"),
-//                StringData.fromString("Danny"), 24,
-//                TimestampData.fromEpochMillis(1),
-//                StringData.fromString("par1"));
-//        BinaryRowData update = insertRow(
-//                (RowType)ROW_DATA_TYPE.getLogicalType(),
-//                StringData.fromString("id1"),
-//                StringData.fromString("Danny"),
-//                24,
-//                TimestampData.fromEpochMillis(1),
-//                StringData.fromString("par1"));
-//        update.setRowKind(RowKind.UPDATE_AFTER);
-
+        Row ins = Row.ofKind(RowKind.UPDATE_AFTER,
+                "id1",
+                "Danny",
+                24,
+                "1",
+                "par1");
+        Row delete = Row.ofKind(RowKind.DELETE, "id1",
+                "Danny",
+                24,
+                "2",
+                "par1");
         ArrayList<Row> r = new ArrayList<>();
         r.add(ins);
-//        r.add(update);
+        r.add(delete);
 
-        tableEnv.fromDataStream(env.fromCollection(r)).printSchema();
-        tableEnv.toRetractStream(tableEnv.fromDataStream(env.fromCollection(r)), Row.class).print();
+        Schema shema = Schema.newBuilder()
+                .column("id", DataTypes.VARCHAR(20))
+                .column("name", DataTypes.VARCHAR(10))
+                .column("age", DataTypes.INT())
+                .column("rowtime", DataTypes.TIMESTAMP(3))
+                .column("dt", DataTypes.VARCHAR(10))
+                .build();
 
-        env.execute() ;
+        Table tb = tableEnv.fromChangelogStream(env.fromCollection(r), shema);
+        tb.printSchema();
+        tableEnv.createTemporaryView("file_src_tbl", tb);
+
+//        tableEnv.toRetractStream(tableEnv.fromChangelogStream(env.fromCollection(r)), Row.class).print();
+//        env.execute();
 //
-//        String insertSql = "insert into file_src_hudi_tbl /*+ OPTIONS(" +
-//                "    'changelog.enabled' = 'true'," +
-//                "    'hoodie.table.version.fields' = 'dt,hm', \n" +
-//                "    'hoodie.table.version.values' = '2022-01-01,1100'\n" +
-//                ") */" +
-//                " select " +
-//                "id," +
-//                "name," +
-//                "count(1) as age," +
-//                "DATE_FORMAT('2011-11-11 11:11:11','yyyy-MM-dd HH:mm:ss') as rowtime," +
-//                "DATE_FORMAT('2011-11-11 11:11:11','yyyy-MM-dd') as dt" +
-//                " from file_src_tbl group by id, name";
+        String insertSql = "insert into file_src_hudi_tbl /*+ OPTIONS(" +
+                "    'changelog.enabled' = 'true'," +
+                "    'hoodie.table.version.fields' = 'dt,hm', \n" +
+                "    'hoodie.table.version.values' = '2022-01-01,1100'\n" +
+                ") */" +
+                "  select * from file_src_tbl";
 
-//        tableEnv.executeSql(insertSql).await();
+        tableEnv.executeSql(insertSql).await();
     }
+
     @org.junit.Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
         tableEnv.executeSql(FILE_SRC_HUDI_TBL(pathName));
-        tableEnv.toRetractStream(tableEnv.sqlQuery("select count(1) from file_src_hudi_tbl " +
+        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from file_src_hudi_tbl " +
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +
-                        "'write.precombine' = 'true',"+
+                        "'write.precombine' = 'true'," +
                         "'read.tasks'='1'," +
                         "'read.start-commit'='0'," +
                         "'read.end-commit'='20240621170750480') */"), Row.class)
@@ -95,25 +96,4 @@ public class ITTestChangelogWrite extends TestUtil{
         env.execute();
     }
 
-    public static BinaryRowData insertRow(RowType rowType, Object... fields) {
-        LogicalType[] types = rowType.getFields().stream().map(RowType.RowField::getType)
-                .toArray(LogicalType[]::new);
-        assertEquals(
-                "Filed count inconsistent with type information",
-                fields.length,
-                types.length);
-        BinaryRowData row = new BinaryRowData(fields.length);
-        BinaryRowWriter writer = new BinaryRowWriter(row);
-        writer.reset();
-        for (int i = 0; i < fields.length; i++) {
-            Object field = fields[i];
-            if (field == null) {
-                writer.setNullAt(i);
-            } else {
-                BinaryWriter.write(writer, i, field, types[i], InternalSerializers.create(types[i]));
-            }
-        }
-        writer.complete();
-        return row;
-    }
 }

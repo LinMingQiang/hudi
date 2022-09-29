@@ -100,7 +100,7 @@ public class ITTestDataStreamWrite extends TestLogger {
   @ParameterizedTest
   @ValueSource(strings = {"BUCKET", "FLINK_STATE"})
   public void testWriteCopyOnWrite(String indexType) throws Exception {
-    Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    Configuration conf = TestConfigurations.getDefaultConf("file://"+tempFile.getAbsolutePath());
     conf.setString(FlinkOptions.INDEX_TYPE, indexType);
     conf.setInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS, 1);
     conf.setString(FlinkOptions.INDEX_KEY_FIELD, "id");
@@ -146,11 +146,13 @@ public class ITTestDataStreamWrite extends TestLogger {
   @ParameterizedTest
   @ValueSource(strings = {"BUCKET", "FLINK_STATE"})
   public void testWriteMergeOnReadWithCompaction(String indexType) throws Exception {
-    Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    Configuration conf = TestConfigurations.getDefaultConf("file://"+tempFile.getAbsolutePath());
     conf.setString(FlinkOptions.INDEX_TYPE, indexType);
     conf.setInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS, 4);
     conf.setString(FlinkOptions.INDEX_KEY_FIELD, "id");
     conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, 1);
+    conf.setBoolean(FlinkOptions.COMPACTION_ASYNC_ENABLED, false);
+
     conf.setString(FlinkOptions.TABLE_TYPE, HoodieTableType.MERGE_ON_READ.name());
 
     testWriteToHoodie(conf, "mor_write_with_compact", 1, EXPECTED);
@@ -167,9 +169,11 @@ public class ITTestDataStreamWrite extends TestLogger {
   }
 
   private void testWriteCopyOnWriteWithClustering(boolean sortClusteringEnabled) throws Exception {
-    Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    Configuration conf = TestConfigurations.getDefaultConf("file://"+tempFile.getAbsolutePath());
     conf.setBoolean(FlinkOptions.CLUSTERING_SCHEDULE_ENABLED, true);
+    conf.setInteger(FlinkOptions.CLUSTERING_TASKS, 1);
     conf.setInteger(FlinkOptions.CLUSTERING_DELTA_COMMITS, 1);
+//    conf.setBoolean(FlinkOptions.CLUSTERING_ASYNC_ENABLED, true);
     conf.setString(FlinkOptions.OPERATION, "insert");
     if (sortClusteringEnabled) {
       conf.setString(FlinkOptions.CLUSTERING_SORT_COLUMNS, "uuid");
@@ -182,7 +186,7 @@ public class ITTestDataStreamWrite extends TestLogger {
       Transformer transformer,
       String jobName,
       Map<String, List<String>> expected) throws Exception {
-    testWriteToHoodie(TestConfigurations.getDefaultConf(tempFile.getAbsolutePath()),
+    testWriteToHoodie(TestConfigurations.getDefaultConf("file://"+tempFile.getAbsolutePath()),
         Option.of(transformer), jobName, 2, expected);
   }
 
@@ -202,7 +206,7 @@ public class ITTestDataStreamWrite extends TestLogger {
       Map<String, List<String>> expected) throws Exception {
 
     StreamExecutionEnvironment execEnv = StreamExecutionEnvironment.getExecutionEnvironment();
-    execEnv.getConfig().disableObjectReuse();
+//    execEnv.getConfig().disableObjectReuse();
     execEnv.setParallelism(4);
     // set up checkpoint interval
     execEnv.enableCheckpointing(4000, CheckpointingMode.EXACTLY_ONCE);
@@ -336,7 +340,7 @@ public class ITTestDataStreamWrite extends TestLogger {
     // set up checkpoint interval
     execEnv.enableCheckpointing(4000, CheckpointingMode.EXACTLY_ONCE);
     execEnv.getCheckpointConfig().setMaxConcurrentCheckpoints(1);
-    Configuration conf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    Configuration conf = TestConfigurations.getDefaultConf("file://"+tempFile.getAbsolutePath());
     conf.setString(FlinkOptions.TABLE_NAME, "t1");
     conf.setString(FlinkOptions.TABLE_TYPE, "MERGE_ON_READ");
 
@@ -345,10 +349,10 @@ public class ITTestDataStreamWrite extends TestLogger {
     TestData.writeData(TestData.dataSetInsert(3, 4), conf);
     TestData.writeData(TestData.dataSetInsert(5, 6), conf);
 
-    String latestCommit = TestUtils.getLastCompleteInstant(tempFile.getAbsolutePath());
+    String latestCommit = TestUtils.getLastCompleteInstant("file://"+tempFile.getAbsolutePath());
 
     Map<String, String> options = new HashMap<>();
-    options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
+    options.put(FlinkOptions.PATH.key(), "file://"+tempFile.getAbsolutePath());
     options.put(FlinkOptions.READ_START_COMMIT.key(), latestCommit);
 
     //read a hoodie table use low-level source api.
@@ -378,7 +382,7 @@ public class ITTestDataStreamWrite extends TestLogger {
     execEnv.enableCheckpointing(4000, CheckpointingMode.EXACTLY_ONCE);
     execEnv.getCheckpointConfig().setMaxConcurrentCheckpoints(1);
 
-    options.put(FlinkOptions.PATH.key(), tempFile.getAbsolutePath());
+    options.put(FlinkOptions.PATH.key(), "file://"+tempFile.getAbsolutePath());
     options.put(FlinkOptions.SOURCE_AVRO_SCHEMA_PATH.key(), Objects.requireNonNull(Thread.currentThread().getContextClassLoader().getResource("test_read_schema.avsc")).toString());
     Configuration conf = Configuration.fromMap(options);
     // Read from file source

@@ -83,6 +83,7 @@ public class TestUtil {
 
     static{
         env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.getConfig().setLatencyTrackingInterval(1000L);
         env.setParallelism(1);
         env.getCheckpointConfig().setCheckpointInterval(5000L);
     }

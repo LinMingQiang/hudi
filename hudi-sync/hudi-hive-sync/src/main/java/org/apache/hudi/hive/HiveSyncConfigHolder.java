@@ -125,4 +125,9 @@ public class HiveSyncConfigHolder {
       .key("hoodie.datasource.hive_sync.sync_comment")
       .defaultValue("false")
       .withDocumentation("Whether to sync the table column comments while syncing the table.");
+
+  public static final ConfigProperty<String> HIVE_SYNC_ONLY_RO_OR_RT = ConfigProperty
+          .key("hoodie.datasource.hive_sync.table.ro_or_rt")
+          .defaultValue("both")
+          .withDocumentation("Sync read optimized table or realtime table or both.");
 }
