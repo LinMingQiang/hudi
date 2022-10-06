@@ -19,7 +19,7 @@ public class ITTestNodataRollback extends TestUtil {
             "  'path' = 'file:///Users/hunter/workspace/hudipr/master-debug/hudi-examples/hudi-examples-debug/src/test/resources/testData2',\n" +
             "  'format' = 'csv'\n" +
             ")";
-    String hudiDDL = "CREATE TABLE file_src_hudi_tbl(\n" +
+    String hudiDDL = "CREATE TABLE HUDI_MOR_TBL(\n" +
             "    id STRING PRIMARY KEY NOT ENFORCED,\n" +
             "   `name` STRING,\n" +
             "    age bigint,\n" +
@@ -35,7 +35,7 @@ public class ITTestNodataRollback extends TestUtil {
             "    'index.type' = 'BUCKET', \n" +
             "    'hoodie.bucket.index.num.buckets'='1', \n" +
             "    'write.tasks' = '1')";
-    String inserDml = "insert into file_src_hudi_tbl " +
+    String inserDml = "insert into HUDI_MOR_TBL " +
             " select " +
             "id," +
             "name," +

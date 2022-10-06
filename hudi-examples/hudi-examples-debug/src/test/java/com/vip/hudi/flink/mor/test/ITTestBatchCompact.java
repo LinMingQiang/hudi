@@ -11,8 +11,8 @@ public class ITTestBatchCompact  extends TestUtil{
     public void testWrite() throws ExecutionException, InterruptedException {
         init(RuntimeExecutionMode.BATCH);
         tableEnv.executeSql(FILE_SRC_TBL);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(tblName));
-        String insertSql = "insert into file_src_hudi_tbl " +
+        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        String insertSql = "insert into HUDI_MOR_TBL " +
                 " select " +
                 "id," +
                 "name," +
@@ -27,8 +27,8 @@ public class ITTestBatchCompact  extends TestUtil{
     @org.junit.Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(tblName));
-        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from  file_src_hudi_tbl"+
+        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from  HUDI_MOR_TBL"+
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +
                         "'write.precombine' = 'true',"+

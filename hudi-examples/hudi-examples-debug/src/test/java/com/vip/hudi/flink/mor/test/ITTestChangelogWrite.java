@@ -40,7 +40,7 @@ public class ITTestChangelogWrite extends TestUtil {
     public void testWrite() throws Exception {
         init(RuntimeExecutionMode.STREAMING);
         tableEnv.getConfig().set("table.exec.sink.upsert-materialize","none");
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(pathName));
+        tableEnv.executeSql(HUDI_MOR_TBL(pathName));
         Row ins = Row.ofKind(RowKind.UPDATE_AFTER,
                 "id1",
                 "Danny",
@@ -71,7 +71,7 @@ public class ITTestChangelogWrite extends TestUtil {
 //        tableEnv.toRetractStream(tableEnv.fromChangelogStream(env.fromCollection(r)), Row.class).print();
 //        env.execute();
 //
-        String insertSql = "insert into file_src_hudi_tbl /*+ OPTIONS(" +
+        String insertSql = "insert into HUDI_MOR_TBL /*+ OPTIONS(" +
                 "    'changelog.enabled' = 'true'," +
                 "    'hoodie.table.version.fields' = 'dt,hm', \n" +
                 "    'hoodie.table.version.values' = '2022-01-01,1100'\n" +
@@ -84,8 +84,8 @@ public class ITTestChangelogWrite extends TestUtil {
     @org.junit.Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(pathName));
-        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from file_src_hudi_tbl " +
+        tableEnv.executeSql(HUDI_MOR_TBL(pathName));
+        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from HUDI_MOR_TBL " +
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +
                         "'write.precombine' = 'true'," +

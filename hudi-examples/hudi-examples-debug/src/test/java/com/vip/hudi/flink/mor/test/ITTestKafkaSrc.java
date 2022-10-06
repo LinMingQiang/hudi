@@ -37,8 +37,8 @@ public class ITTestKafkaSrc extends TestUtil {
     public void testWrite() throws ExecutionException, InterruptedException {
         init(RuntimeExecutionMode.BATCH);
         tableEnv.executeSql(KAFKA_SRC_TBL);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(pathName));
-        String insertSql = "insert into file_src_hudi_tbl /*+ OPTIONS(" +
+        tableEnv.executeSql(HUDI_MOR_TBL(pathName));
+        String insertSql = "insert into HUDI_MOR_TBL /*+ OPTIONS(" +
                 "    'hoodie.table.version.fields' = 'dt,hm', \n" +
                 "    'hoodie.table.version.values' = '2022-01-01,1100'\n" +
                 ") */" +
@@ -59,8 +59,8 @@ public class ITTestKafkaSrc extends TestUtil {
     @Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(pathName));
-        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from file_src_hudi_tbl " +
+        tableEnv.executeSql(HUDI_MOR_TBL(pathName));
+        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from HUDI_MOR_TBL " +
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +
                         "'write.precombine' = 'true'," +

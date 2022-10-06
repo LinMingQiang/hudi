@@ -8,8 +8,8 @@ import java.util.concurrent.ExecutionException;
 public class ITTestSchemaEvolution extends TestUtil{
     public String tblName = "ITTestDynamicSchema";
 
-    public String FILE_SRC_HUDI_TBL2(String path){
-        return "CREATE TABLE file_src_hudi_tbl2(\n" +
+    public String HUDI_MOR_TBL2(String path){
+        return "CREATE TABLE HUDI_MOR_TBL2(\n" +
                 "    id STRING PRIMARY KEY NOT ENFORCED,\n" +
                 "   `name` STRING,\n" +
                 "    age int,\n" +
@@ -37,8 +37,8 @@ public class ITTestSchemaEvolution extends TestUtil{
         tableEnv.executeSql(FILE_SRC_TBL);
 
 
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(tblName));
-        String insertSql = "insert into file_src_hudi_tbl " +
+        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        String insertSql = "insert into HUDI_MOR_TBL " +
                 " select " +
                 "id," +
                 "name," +
@@ -49,8 +49,8 @@ public class ITTestSchemaEvolution extends TestUtil{
         tableEnv.executeSql(insertSql).await();
 
 
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL2(tblName));
-        String insertSql2 = "insert into file_src_hudi_tbl2 " +
+        tableEnv.executeSql(HUDI_MOR_TBL2(tblName));
+        String insertSql2 = "insert into HUDI_MOR_TBL2 " +
                 " select " +
                 "id," +
                 "name," +
@@ -65,8 +65,8 @@ public class ITTestSchemaEvolution extends TestUtil{
     @org.junit.Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL2(tblName));
-        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from file_src_hudi_tbl2"+
+        tableEnv.executeSql(HUDI_MOR_TBL2(tblName));
+        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from HUDI_MOR_TBL2"+
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +
                         "'write.precombine' = 'true',"+

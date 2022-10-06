@@ -11,8 +11,8 @@ public class ITTestHiveSync extends TestUtil{
     public void testWrite() throws ExecutionException, InterruptedException {
         init(RuntimeExecutionMode.BATCH);
         tableEnv.executeSql(FILE_SRC_TBL);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(tblName));
-        String insertSql = "insert into file_src_hudi_tbl /*+ OPTIONS(" +
+        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        String insertSql = "insert into HUDI_MOR_TBL /*+ OPTIONS(" +
                 "    'hive_sync.enable' = 'true',\n" +
                 "    'hive_sync.mode' = 'hms',\n" +
                 "    'hive_sync.metastore.uris' = 'thrift://localhost:9083',\n" + //bigdata-hiveserver.vip.vip.com
@@ -33,8 +33,8 @@ public class ITTestHiveSync extends TestUtil{
     @org.junit.Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
-        tableEnv.executeSql(FILE_SRC_HUDI_TBL(tblName));
-        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from file_src_hudi_tbl " +
+        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        tableEnv.toRetractStream(tableEnv.sqlQuery("select * from HUDI_MOR_TBL " +
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +
                         "'write.precombine' = 'true',"+

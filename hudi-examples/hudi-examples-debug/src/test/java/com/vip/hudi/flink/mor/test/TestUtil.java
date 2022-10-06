@@ -37,8 +37,10 @@ public class TestUtil {
             "  'format' = 'csv'\n" +
             ")";
 
-    public String FILE_SRC_HUDI_TBL(String path){
-        return "CREATE TABLE file_src_hudi_tbl(\n" +
+
+
+    public String HUDI_MOR_TBL(String path){
+        return "CREATE TABLE HUDI_MOR_TBL(\n" +
                 "    id STRING PRIMARY KEY NOT ENFORCED,\n" +
                 "   `name` STRING,\n" +
                 "    age bigint,\n" +
@@ -92,6 +94,22 @@ public class TestUtil {
         tableEnv = StreamTableEnvironment.create(env);
     }
 
+
+    public static String DATAGEN_SRC_TBL(boolean isStreaming){
+        String s = "'number-of-rows' = '5'";
+        if (isStreaming) {
+            s = "'rows-per-second' = '5'";
+        }
+         return "create table DATAGEN_SRC_TBL (\n" +
+                "    id VARCHAR,\n" +
+                "    name varchar,\n" +
+                "    age int,\n" +
+                "    rowtime TIMESTAMP(3),\n" +
+                "    `dt` as DATE_FORMAT(rowtime, 'yyyy-MM-dd')\n" +
+                ") with (\n" +
+                "  'connector' = 'datagen',\n" + s +
+                ")";
+    }
 
     public static String readFile(String filePath) {
         if(filePath == null){
