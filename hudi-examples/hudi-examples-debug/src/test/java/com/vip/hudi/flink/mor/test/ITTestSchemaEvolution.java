@@ -1,11 +1,12 @@
 package com.vip.hudi.flink.mor.test;
 
+import com.vip.hudi.flink.utils.TestUtil;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.types.Row;
 
 import java.util.concurrent.ExecutionException;
 
-public class ITTestSchemaEvolution extends TestUtil{
+public class ITTestSchemaEvolution extends TestUtil {
     public String tblName = "ITTestDynamicSchema";
 
     public String HUDI_MOR_TBL2(String path){

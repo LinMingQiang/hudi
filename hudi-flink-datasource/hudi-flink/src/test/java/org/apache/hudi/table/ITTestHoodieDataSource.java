@@ -267,7 +267,7 @@ public class ITTestHoodieDataSource extends AbstractTestBase {
     streamTableEnv.executeSql(createSource);
 
     String hoodieTableDDL = sql("t1")
-        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
+        .option(FlinkOptions.PATH, "file://" + tempFile.getAbsolutePath())
         .option(FlinkOptions.TABLE_TYPE, FlinkOptions.TABLE_TYPE_MERGE_ON_READ)
         .option(FlinkOptions.READ_AS_STREAMING, true)
         .option(FlinkOptions.READ_STREAMING_SKIP_COMPACT, true)
@@ -278,7 +278,7 @@ public class ITTestHoodieDataSource extends AbstractTestBase {
     String insertInto = "insert into t1 select * from source";
     execInsertSql(streamTableEnv, insertInto);
 
-    String instant = TestUtils.getNthCompleteInstant(tempFile.getAbsolutePath(), 2, true);
+    String instant = TestUtils.getNthCompleteInstant("file://" + tempFile.getAbsolutePath(), 2, true);
 
     streamTableEnv.getConfig().getConfiguration()
         .setBoolean("table.dynamic-table-options.enabled", true);
@@ -287,25 +287,33 @@ public class ITTestHoodieDataSource extends AbstractTestBase {
     assertRowsEquals(rows, TestData.DATA_SET_SOURCE_INSERT_LATEST_COMMIT);
   }
 
-  @Test
-  void testStreamWriteWithCleaning() {
+  @ParameterizedTest
+  @EnumSource(value = ExecMode.class)
+  void testStreamWriteWithCleaning(ExecMode execMode) {
     // create filesystem table named source
-
+    TableEnvironment tableEnv = execMode == ExecMode.BATCH ? batchTableEnv : streamTableEnv;
+    boolean isStreaming = execMode == ExecMode.STREAM;
     // the source generates 4 commits but the cleaning task
     // would always try to keep the remaining commits number as 1
-    String createSource = TestConfigurations.getFileSourceDDL(
-        "source", "test_source_3.data", 4);
-    streamTableEnv.executeSql(createSource);
-
     String hoodieTableDDL = sql("t1")
-        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
+        .option(FlinkOptions.PATH, "file://" + tempFile.getAbsolutePath())
         .option(FlinkOptions.CLEAN_RETAIN_COMMITS, 1)
         .end();
-    streamTableEnv.executeSql(hoodieTableDDL);
-    String insertInto = "insert into t1 select * from source";
-    execInsertSql(streamTableEnv, insertInto);
-
-    Configuration defaultConf = TestConfigurations.getDefaultConf(tempFile.getAbsolutePath());
+    tableEnv.executeSql(hoodieTableDDL);
+    if (isStreaming) {
+      String createSource = TestConfigurations.getFileSourceDDL(
+              "source", "test_source_3.data", 4);
+      tableEnv.executeSql(createSource);
+      String insertInto = "insert into t1 select * from source";
+      execInsertSql(tableEnv, insertInto);
+    } else {
+      String insertInto = "insert into t1 values\n"
+              + "('id1','Danny',23,TIMESTAMP '1970-01-01 00:00:01','par1')";
+      execInsertSql(tableEnv, insertInto);
+      execInsertSql(tableEnv, insertInto);
+      execInsertSql(tableEnv, insertInto);
+    }
+    Configuration defaultConf = TestConfigurations.getDefaultConf("file://" + tempFile.getAbsolutePath());
     Map<String, String> options1 = new HashMap<>(defaultConf.toMap());
     options1.put(FlinkOptions.TABLE_NAME.key(), "t1");
     Configuration conf = Configuration.fromMap(options1);

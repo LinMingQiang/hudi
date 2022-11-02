@@ -1,8 +1,7 @@
 package com.vip.hudi.flink.pr;
 
-import com.vip.hudi.flink.mor.test.TestUtil;
+import com.vip.hudi.flink.utils.TestUtil;
 import org.apache.flink.api.common.RuntimeExecutionMode;
-import org.apache.flink.types.Row;
 
 import java.util.concurrent.ExecutionException;
 

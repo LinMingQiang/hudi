@@ -1,4 +1,4 @@
-package com.vip.hudi.flink.mor.test;
+package com.vip.hudi.flink.utils;
 
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 public class TestUtil {
     public static StreamTableEnvironment tableEnv = null;
     public static StreamExecutionEnvironment env = null;
-
     public static String FILE_HUDI_PATH = "file://" + System.getProperty("user.dir") + "/target/";
 
     public static String FILE_SRC_PATH = "file://" + System.getProperty("user.dir") + "/src/test/resources/testData";
@@ -25,6 +24,7 @@ public class TestUtil {
             FILE_SRC_PATH = System.getProperty("user.dir") + "\\src\\test\\resources\\testData";
         }
     }
+
     public static String FILE_SRC_TBL = "create table file_src_tbl (\n" +
             "    id VARCHAR,\n" +
             "    name varchar,\n" +
@@ -155,4 +155,5 @@ public class TestUtil {
             }
         }
     }
+
 }

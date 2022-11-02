@@ -1,17 +1,18 @@
 package com.vip.hudi.flink.mor.test;
 
+import com.vip.hudi.flink.utils.TestUtil;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.types.Row;
 
 import java.util.concurrent.ExecutionException;
 
-public class ITTestBatchCompact  extends TestUtil{
-    String tblName = "ITTestVipVersionMapping";
+public class ITTestBatchCompact  extends TestUtil {
+    public static String TABLE_NAME = "ITTestBatchCompact";
     @org.junit.Test
     public void testWrite() throws ExecutionException, InterruptedException {
         init(RuntimeExecutionMode.BATCH);
         tableEnv.executeSql(FILE_SRC_TBL);
-        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        tableEnv.executeSql(HUDI_MOR_TBL(TABLE_NAME));
         String insertSql = "insert into HUDI_MOR_TBL " +
                 " select " +
                 "id," +
@@ -27,7 +28,7 @@ public class ITTestBatchCompact  extends TestUtil{
     @org.junit.Test
     public void testRead() throws Exception {
         init(RuntimeExecutionMode.BATCH);
-        tableEnv.executeSql(HUDI_MOR_TBL(tblName));
+        tableEnv.executeSql(HUDI_MOR_TBL(TABLE_NAME));
         tableEnv.toRetractStream(tableEnv.sqlQuery("select * from  HUDI_MOR_TBL"+
                         "/*+ OPTIONS(" +
                         "'read.streaming.enabled' = 'false'," +

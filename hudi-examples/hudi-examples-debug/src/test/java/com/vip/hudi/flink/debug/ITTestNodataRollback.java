@@ -1,6 +1,6 @@
 package com.vip.hudi.flink.debug;
 
-import com.vip.hudi.flink.mor.test.TestUtil;
+import com.vip.hudi.flink.utils.TestUtil;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.junit.jupiter.api.Test;
 

@@ -1,11 +1,12 @@
 package com.vip.hudi.flink.mor.test;
 
+import com.vip.hudi.flink.utils.TestUtil;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.types.Row;
 
 import java.util.concurrent.ExecutionException;
 
-public class ITTestHiveSync extends TestUtil{
+public class ITTestHiveSync extends TestUtil {
     String tblName = "ITTestHiveSync";
     @org.junit.Test
     public void testWrite() throws ExecutionException, InterruptedException {

@@ -1,6 +1,6 @@
 package com.vip.hudi.flink.dingding.test;
 
-import com.vip.hudi.flink.mor.test.TestUtil;
+import com.vip.hudi.flink.utils.TestUtil;
 import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.types.Row;
 import org.junit.jupiter.api.Test;
