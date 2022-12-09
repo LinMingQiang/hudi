@@ -67,6 +67,7 @@ import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
 import static org.apache.hudi.common.model.WriteConcurrencyMode.SINGLE_WRITER;
+import static org.apache.hudi.common.model.WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL;
 import static org.apache.hudi.util.StreamerUtil.initTableIfNotExists;
 
 /**
@@ -245,7 +246,11 @@ public class StreamWriteOperatorCoordinator
 
           if (tableState.scheduleCompaction) {
             // if async compaction is on, schedule the compaction
-            CompactionUtil.scheduleCompaction(metaClient, writeClient, tableState.isDeltaTimeCompaction, committed);
+            CompactionUtil.scheduleCompaction(metaClient,
+                    writeClient,
+                    this.writeClient.getConfig().getWriteConcurrencyMode() == OPTIMISTIC_CONCURRENCY_CONTROL
+                            || tableState.isDeltaTimeCompaction,
+                    committed);
           }
 
           if (tableState.scheduleClustering) {
