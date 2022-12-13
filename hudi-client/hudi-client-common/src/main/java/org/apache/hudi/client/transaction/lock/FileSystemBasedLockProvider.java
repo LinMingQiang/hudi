@@ -20,6 +20,8 @@
 package org.apache.hudi.client.transaction.lock;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hudi.common.config.LockConfiguration;
@@ -27,6 +29,7 @@ import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.lock.LockProvider;
 import org.apache.hudi.common.lock.LockState;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.util.FileIOUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -57,6 +60,7 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
   private final transient FileSystem fs;
   private final transient Path lockFile;
   protected LockConfiguration lockConfiguration;
+  private String lockInfo;
 
   public FileSystemBasedLockProvider(final LockConfiguration lockConfiguration, final Configuration configuration) {
     checkRequiredProps(lockConfiguration);
@@ -92,6 +96,7 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
             fs.delete(this.lockFile, true);
             LOG.warn("Delete expired lock file: " + this.lockFile);
           } else {
+            setLockInfo(readLockInfo());
             return false;
           }
         }
@@ -122,6 +127,15 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
     return this.lockFile.toString();
   }
 
+  @Override
+  public String getLockInfo() {
+    return lockInfo;
+  }
+
+  public void setLockInfo(String lockInfo) {
+    this.lockInfo = lockInfo;
+  }
+
   private boolean checkIfExpired() {
     if (lockTimeoutMinutes == 0) {
       return false;
@@ -139,7 +153,38 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
 
   private void acquireLock() {
     try {
-      fs.create(this.lockFile, false).close();
+      if (!fs.exists(this.lockFile)) {
+        FSDataOutputStream fos = fs.create(this.lockFile, false);
+        setLockInfo(generateLockInfo());
+        fos.writeBytes(lockInfo);
+        fos.close();
+      }
+    } catch (IOException e) {
+      throw new HoodieIOException(generateLogStatement(LockState.FAILED_TO_ACQUIRE), e);
+    }
+  }
+
+  public String generateLockInfo() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(String.format("LOCK-TIME : %s \n", System.currentTimeMillis()));
+    sb.append(String.format("LOCK-THREAD : %s \n", Thread.currentThread().getName()));
+    sb.append("LOCK-STACK-INFO : \n");
+    StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+    for (StackTraceElement ste : stack) {
+      sb.append(String.format("\t %s.%s (%s:%s) \n", ste.getClassName(), ste.getMethodName(),
+              ste.getFileName(), ste.getLineNumber()));
+    }
+    return sb.toString();
+  }
+
+  public String readLockInfo() {
+    try {
+      if (fs.exists(this.lockFile)) {
+        FSDataInputStream fis = fs.open(this.lockFile);
+        return FileIOUtils.readAsUTFString(fis);
+      } else {
+        return "";
+      }
     } catch (IOException e) {
       throw new HoodieIOException(generateLogStatement(LockState.FAILED_TO_ACQUIRE), e);
     }
