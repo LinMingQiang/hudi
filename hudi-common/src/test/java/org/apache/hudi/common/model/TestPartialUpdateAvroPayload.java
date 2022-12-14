@@ -18,12 +18,11 @@
 
 package org.apache.hudi.common.model;
 
+import org.apache.hudi.common.util.Option;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
-
-import org.apache.hudi.common.util.Option;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +34,6 @@ import java.util.Properties;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-
 
 /**
  * Unit tests {@link TestPartialUpdateAvroPayload}.
@@ -55,7 +53,7 @@ public class TestPartialUpdateAvroPayload {
       + "    {\"name\": \"id\", \"type\": [\"null\", \"string\"]},\n"
       + "    {\"name\": \"partition\", \"type\": [\"null\", \"string\"]},\n"
       + "    {\"name\": \"ts\", \"type\": [\"null\", \"long\"]},\n"
-      + "    {\"name\": \"_hoodie_is_deleted\", \"type\": [\"null\", \"boolean\"], \"default\":false},\n"
+      + "    {\"name\": \"_hoodie_is_deleted\", \"type\": \"boolean\", \"default\": false},\n"
       + "    {\"name\": \"city\", \"type\": [\"null\", \"string\"]},\n"
       + "    {\"name\": \"child\", \"type\": [\"null\", {\"type\": \"array\", \"items\": \"string\"}]}\n"
       + "  ]\n"
@@ -185,8 +183,8 @@ public class TestPartialUpdateAvroPayload {
     record1.put("child", Arrays.asList("A"));
 
     GenericRecord record2 = new GenericData.Record(schema);
-    record1.put("_hoodie_commit_time", "20220915000000001");
-    record1.put("_hoodie_commit_seqno", "20220915000000001_2_000");
+    record2.put("_hoodie_commit_time", "20220915000000001");
+    record2.put("_hoodie_commit_seqno", "20220915000000001_2_000");
     record2.put("id", "1");
     record2.put("partition", "partition1");
     record2.put("ts", 1L);
@@ -204,7 +202,7 @@ public class TestPartialUpdateAvroPayload {
 
     // let payload2 as the latest one, then should use payload2's meta field's value as the result
     GenericRecord mergedRecord2 = (GenericRecord) payload2.preCombine(payload1, schema, properties).getInsertValue(schema, properties).get();
-    assertEquals(mergedRecord2.get("_hoodie_commit_time").toString(), "20220915000000001");
-    assertEquals(mergedRecord2.get("_hoodie_commit_seqno").toString(), "20220915000000001_2_000");
+    assertEquals(mergedRecord2.get("_hoodie_commit_time").toString(), record2.get("_hoodie_commit_time").toString());
+    assertEquals(mergedRecord2.get("_hoodie_commit_seqno").toString(), record2.get("_hoodie_commit_seqno").toString());
   }
 }

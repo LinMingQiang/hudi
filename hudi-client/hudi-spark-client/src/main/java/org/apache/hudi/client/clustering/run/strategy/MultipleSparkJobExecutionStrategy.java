@@ -30,12 +30,10 @@ import org.apache.hudi.common.config.SerializableConfiguration;
 import org.apache.hudi.common.data.HoodieData;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.ClusteringOperation;
-import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieFileGroupId;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordPayload;
-import org.apache.hudi.common.model.RewriteAvroPayload;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.util.CollectionUtils;
@@ -47,7 +45,6 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.data.HoodieJavaRDD;
 import org.apache.hudi.exception.HoodieClusteringException;
-import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.execution.bulkinsert.BulkInsertInternalPartitionerFactory;
 import org.apache.hudi.execution.bulkinsert.BulkInsertInternalPartitionerWithRowsFactory;
 import org.apache.hudi.execution.bulkinsert.RDDCustomColumnsSortPartitioner;
@@ -57,16 +54,12 @@ import org.apache.hudi.execution.bulkinsert.RowSpatialCurveSortPartitioner;
 import org.apache.hudi.io.IOUtils;
 import org.apache.hudi.io.storage.HoodieFileReader;
 import org.apache.hudi.io.storage.HoodieFileReaderFactory;
-import org.apache.hudi.keygen.BaseKeyGenerator;
-import org.apache.hudi.keygen.KeyGenUtils;
-import org.apache.hudi.keygen.factory.HoodieSparkKeyGeneratorFactory;
 import org.apache.hudi.table.BulkInsertPartitioner;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.HoodieWriteMetadata;
 import org.apache.hudi.table.action.cluster.strategy.ClusteringExecutionStrategy;
 
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.log4j.LogManager;
@@ -90,6 +83,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hudi.common.config.HoodieCommonConfig.TIMESTAMP_AS_OF;
 import static org.apache.hudi.common.table.log.HoodieFileSliceReader.getFileSliceReader;
 import static org.apache.hudi.config.HoodieClusteringConfig.PLAN_STRATEGY_SORT_COLUMNS;
 
@@ -110,20 +104,20 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
     boolean shouldPreserveMetadata = Option.ofNullable(clusteringPlan.getPreserveHoodieMetadata()).orElse(false);
     // execute clustering for each group async and collect WriteStatus
     Stream<HoodieData<WriteStatus>> writeStatusesStream = FutureUtils.allOf(
-        clusteringPlan.getInputGroups().stream()
-            .map(inputGroup -> {
-              if (getWriteConfig().getBooleanOrDefault("hoodie.datasource.write.row.writer.enable", false)) {
-                return runClusteringForGroupAsyncAsRow(inputGroup,
-                    clusteringPlan.getStrategy().getStrategyParams(),
-                    shouldPreserveMetadata,
-                    instantTime);
-              }
-              return runClusteringForGroupAsync(inputGroup,
-                  clusteringPlan.getStrategy().getStrategyParams(),
-                  shouldPreserveMetadata,
-                  instantTime);
-            })
-            .collect(Collectors.toList()))
+            clusteringPlan.getInputGroups().stream()
+                .map(inputGroup -> {
+                  if (getWriteConfig().getBooleanOrDefault("hoodie.datasource.write.row.writer.enable", false)) {
+                    return runClusteringForGroupAsyncAsRow(inputGroup,
+                        clusteringPlan.getStrategy().getStrategyParams(),
+                        shouldPreserveMetadata,
+                        instantTime);
+                  }
+                  return runClusteringForGroupAsync(inputGroup,
+                      clusteringPlan.getStrategy().getStrategyParams(),
+                      shouldPreserveMetadata,
+                      instantTime);
+                })
+                .collect(Collectors.toList()))
         .join()
         .stream();
     JavaRDD<WriteStatus>[] writeStatuses = convertStreamToArray(writeStatusesStream.map(HoodieJavaRDD::getJavaRDD));
@@ -136,7 +130,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
 
   /**
    * Execute clustering to write inputRecords into new files based on strategyParams.
-   * Different from {@link performClusteringWithRecordsRDD}, this method take {@link Dataset<Row>}
+   * Different from {@link MultipleSparkJobExecutionStrategy#performClusteringWithRecordsRDD}, this method take {@link Dataset<Row>}
    * as inputs.
    */
   public abstract HoodieData<WriteStatus> performClusteringWithRecordsAsRow(final Dataset<Row> inputRecords,
@@ -202,17 +196,18 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
           return isRowPartitioner
               ? new RowSpatialCurveSortPartitioner(getWriteConfig())
               : new RDDSpatialCurveSortPartitioner((HoodieSparkEngineContext) getEngineContext(), orderByColumns, layoutOptStrategy,
-                  getWriteConfig().getLayoutOptimizationCurveBuildMethod(), HoodieAvroUtils.addMetadataFields(schema));
+              getWriteConfig().getLayoutOptimizationCurveBuildMethod(), HoodieAvroUtils.addMetadataFields(schema));
         case LINEAR:
           return isRowPartitioner
               ? new RowCustomColumnsSortPartitioner(orderByColumns)
               : new RDDCustomColumnsSortPartitioner(orderByColumns, HoodieAvroUtils.addMetadataFields(schema),
-                  getWriteConfig().isConsistentLogicalTimestampEnabled());
+              getWriteConfig().isConsistentLogicalTimestampEnabled());
         default:
           throw new UnsupportedOperationException(String.format("Layout optimization strategy '%s' is not supported", layoutOptStrategy));
       }
-    }).orElse(isRowPartitioner ? BulkInsertInternalPartitionerWithRowsFactory.get(getWriteConfig().getBulkInsertSortMode()) :
-        BulkInsertInternalPartitionerFactory.get(getWriteConfig().getBulkInsertSortMode()));
+    }).orElse(isRowPartitioner
+        ? BulkInsertInternalPartitionerWithRowsFactory.get(getWriteConfig(), getHoodieTable().isPartitioned(), true)
+        : BulkInsertInternalPartitionerFactory.get(getHoodieTable(), getWriteConfig(), true));
   }
 
   /**
@@ -270,8 +265,8 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
    * Read records from baseFiles, apply updates and convert to RDD.
    */
   private HoodieData<HoodieRecord<T>> readRecordsForGroupWithLogs(JavaSparkContext jsc,
-                                                               List<ClusteringOperation> clusteringOps,
-                                                               String instantTime) {
+                                                                  List<ClusteringOperation> clusteringOps,
+                                                                  String instantTime) {
     HoodieWriteConfig config = getWriteConfig();
     HoodieTable table = getHoodieTable();
     return HoodieJavaRDD.of(jsc.parallelize(clusteringOps, clusteringOps.size()).mapPartitions(clusteringOpsPartition -> {
@@ -293,6 +288,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
               .withBufferSize(config.getMaxDFSStreamBufferSize())
               .withSpillableMapBasePath(config.getSpillableMapBasePath())
               .withPartition(clusteringOp.getPartitionPath())
+              .withUseScanV2(config.useScanV2ForLogRecordReader())
               .withDiskMapType(config.getCommonConfig().getSpillableDiskMapType())
               .withBitCaskDiskMapCompressionEnabled(config.getCommonConfig().isBitCaskDiskMapCompressionEnabled())
               .build();
@@ -320,7 +316,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
    * Read records from baseFiles and convert to RDD.
    */
   private HoodieData<HoodieRecord<T>> readRecordsForGroupBaseFiles(JavaSparkContext jsc,
-                                                                List<ClusteringOperation> clusteringOps) {
+                                                                   List<ClusteringOperation> clusteringOps) {
     SerializableConfiguration hadoopConf = new SerializableConfiguration(getHoodieTable().getHadoopConf());
     HoodieWriteConfig writeConfig = getWriteConfig();
 
@@ -375,7 +371,7 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
 
     HashMap<String, String> params = new HashMap<>();
     params.put("hoodie.datasource.query.type", "snapshot");
-    params.put("as.of.instant", instantTime);
+    params.put(TIMESTAMP_AS_OF.key(), instantTime);
 
     Path[] paths;
     if (hasLogFiles) {
@@ -422,21 +418,6 @@ public abstract class MultipleSparkJobExecutionStrategy<T extends HoodieRecordPa
    * Transform IndexedRecord into HoodieRecord.
    */
   private static <T> HoodieRecord<T> transform(IndexedRecord indexedRecord, HoodieWriteConfig writeConfig) {
-    GenericRecord record = (GenericRecord) indexedRecord;
-    Option<BaseKeyGenerator> keyGeneratorOpt = Option.empty();
-    if (!writeConfig.populateMetaFields()) {
-      try {
-        keyGeneratorOpt = Option.of((BaseKeyGenerator) HoodieSparkKeyGeneratorFactory.createKeyGenerator(writeConfig.getProps()));
-      } catch (IOException e) {
-        throw new HoodieIOException("Only BaseKeyGenerators are supported when meta columns are disabled ", e);
-      }
-    }
-    String key = KeyGenUtils.getRecordKeyFromGenericRecord(record, keyGeneratorOpt);
-    String partition = KeyGenUtils.getPartitionPathFromGenericRecord(record, keyGeneratorOpt);
-    HoodieKey hoodieKey = new HoodieKey(key, partition);
-
-    HoodieRecordPayload avroPayload = new RewriteAvroPayload(record);
-    HoodieRecord hoodieRecord = new HoodieAvroRecord(hoodieKey, avroPayload);
-    return hoodieRecord;
+    return ExecutionStrategyUtil.transform(indexedRecord, writeConfig);
   }
 }

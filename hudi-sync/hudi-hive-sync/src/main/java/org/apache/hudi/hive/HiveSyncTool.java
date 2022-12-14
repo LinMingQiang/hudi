@@ -25,6 +25,7 @@ import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.InvalidTableException;
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils;
 import org.apache.hudi.hive.util.HiveSchemaUtil;
+import org.apache.hudi.hive.util.PartitionFilterGenerator;
 import org.apache.hudi.sync.common.HoodieSyncClient;
 import org.apache.hudi.sync.common.HoodieSyncTool;
 import org.apache.hudi.sync.common.model.FieldSchema;
@@ -46,8 +47,10 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.hudi.hive.HiveSyncConfig.HIVE_SYNC_FILTER_PUSHDOWN_ENABLED;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_AUTO_CREATE_DATABASE;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_IGNORE_EXCEPTIONS;
+import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SYNC_OMIT_METADATA_FIELDS;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SKIP_RO_SUFFIX_FOR_READ_OPTIMIZED_TABLE;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SUPPORT_TIMESTAMP_TYPE;
 import static org.apache.hudi.hive.HiveSyncConfigHolder.HIVE_SYNC_AS_DATA_SOURCE_TABLE;
@@ -201,7 +204,8 @@ public class HiveSyncTool extends HoodieSyncTool implements AutoCloseable {
     boolean tableExists = syncClient.tableExists(tableName);
 
     // Get the parquet schema for this table looking at the latest commit
-    MessageType schema = syncClient.getStorageSchema();
+    MessageType schema = syncClient.getStorageSchema(!config.getBoolean(HIVE_SYNC_OMIT_METADATA_FIELDS));
+
 
     // Currently HoodieBootstrapRelation does support reading bootstrap MOR rt table,
     // so we disable the syncAsSparkDataSourceTable here to avoid read such kind table
@@ -308,13 +312,43 @@ public class HiveSyncTool extends HoodieSyncTool implements AutoCloseable {
   }
 
   /**
+   * Fetch partitions from meta service, will try to push down more filters to avoid fetching
+   * too many unnecessary partitions.
+   *
+   * @param writtenPartitions partitions has been added, updated, or dropped since last synced.
+   */
+  private List<Partition> getTablePartitions(String tableName, List<String> writtenPartitions) {
+    if (!config.getBooleanOrDefault(HIVE_SYNC_FILTER_PUSHDOWN_ENABLED)) {
+      return syncClient.getAllPartitions(tableName);
+    }
+
+    List<String> partitionKeys = config.getSplitStrings(META_SYNC_PARTITION_FIELDS).stream()
+        .map(String::toLowerCase)
+        .collect(Collectors.toList());
+
+    List<FieldSchema> partitionFields = syncClient.getMetastoreFieldSchemas(tableName)
+        .stream()
+        .filter(f -> partitionKeys.contains(f.getName()))
+        .collect(Collectors.toList());
+
+    return syncClient.getPartitionsByFilter(tableName,
+        PartitionFilterGenerator.generatePushDownFilter(writtenPartitions, partitionFields, config));
+  }
+
+  /**
    * Syncs the list of storage partitions passed in (checks if the partition is in hive, if not adds it or if the
    * partition path does not match, it updates the partition path).
+   *
+   * @param writtenPartitionsSince partitions has been added, updated, or dropped since last synced.
    */
   private boolean syncPartitions(String tableName, List<String> writtenPartitionsSince, Set<String> droppedPartitions) {
     boolean partitionsChanged;
     try {
-      List<Partition> hivePartitions = syncClient.getAllPartitions(tableName);
+      if (writtenPartitionsSince.isEmpty() || config.getSplitStrings(META_SYNC_PARTITION_FIELDS).isEmpty()) {
+        return false;
+      }
+
+      List<Partition> hivePartitions = getTablePartitions(tableName, writtenPartitionsSince);
       List<PartitionEvent> partitionEvents =
           syncClient.getPartitionEvents(hivePartitions, writtenPartitionsSince, droppedPartitions);
 

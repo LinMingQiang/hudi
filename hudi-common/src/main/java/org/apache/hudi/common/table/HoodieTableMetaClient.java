@@ -115,6 +115,12 @@ public class HoodieTableMetaClient implements Serializable {
   private FileSystemRetryConfig fileSystemRetryConfig = FileSystemRetryConfig.newBuilder().build();
   protected HoodieMetastoreConfig metastoreConfig;
 
+  /**
+   *
+   * Instantiate HoodieTableMetaClient.
+   * Can only be called if table already exists
+   *
+   */
   protected HoodieTableMetaClient(Configuration conf, String basePath, boolean loadActiveTimelineOnLoad,
                                 ConsistencyGuardConfig consistencyGuardConfig, Option<TimelineLayoutVersion> layoutVersion,
                                 String payloadClassName, FileSystemRetryConfig fileSystemRetryConfig) {
@@ -412,6 +418,17 @@ public class HoodieTableMetaClient implements Serializable {
         throw new HoodieException("Only simple, non-partitioned or complex key generator are supported when meta-fields are disabled. Used: " + keyGenClass);
       }
     }
+
+    //Check to make sure it's not a COW table with consistent hashing bucket index
+    if (tableType == HoodieTableType.COPY_ON_WRITE) {
+      String indexType = properties.getProperty("hoodie.index.type");
+      if (indexType != null && indexType.equals("BUCKET")) {
+        String bucketEngine = properties.getProperty("hoodie.index.bucket.engine");
+        if (bucketEngine != null && bucketEngine.equals("CONSISTENT_HASHING")) {
+          throw new HoodieException("Consistent hashing bucket index does not work with COW table. Use simple bucket index or an MOR table.");
+        }
+      }
+    }
   }
 
   /**
@@ -503,7 +520,7 @@ public class HoodieTableMetaClient implements Serializable {
    * @return {@code true} if any commits are found, else {@code false}.
    */
   public boolean isTimelineNonEmpty() {
-    return getCommitsTimeline().filterCompletedInstants().getInstants().collect(Collectors.toList()).size() > 0;
+    return !getCommitsTimeline().filterCompletedInstants().empty();
   }
 
   /**
@@ -717,6 +734,9 @@ public class HoodieTableMetaClient implements Serializable {
     return new PropertyBuilder();
   }
 
+  /**
+   * Builder for {@link Properties}.
+   */
   public static class PropertyBuilder {
 
     private HoodieTableType tableType;
@@ -744,6 +764,7 @@ public class HoodieTableMetaClient implements Serializable {
     private Boolean shouldDropPartitionColumns;
     private String metadataPartitions;
     private String inflightMetadataPartitions;
+    private String secondaryIndexesMetadata;
 
     /**
      * Persist the configs that is written at the first time, and should not be changed.
@@ -888,6 +909,11 @@ public class HoodieTableMetaClient implements Serializable {
       return this;
     }
 
+    public PropertyBuilder setSecondaryIndexesMetadata(String secondaryIndexesMetadata) {
+      this.secondaryIndexesMetadata = secondaryIndexesMetadata;
+      return this;
+    }
+
     private void set(String key, Object value) {
       if (HoodieTableConfig.PERSISTED_CONFIG_LIST.contains(key)) {
         this.others.put(key, value);
@@ -895,7 +921,7 @@ public class HoodieTableMetaClient implements Serializable {
     }
 
     public PropertyBuilder set(Map<String, Object> props) {
-      for (String key: HoodieTableConfig.PERSISTED_CONFIG_LIST) {
+      for (String key : HoodieTableConfig.PERSISTED_CONFIG_LIST) {
         Object value = props.get(key);
         if (value != null) {
           set(key, value);
@@ -906,9 +932,9 @@ public class HoodieTableMetaClient implements Serializable {
 
     public PropertyBuilder fromMetaClient(HoodieTableMetaClient metaClient) {
       return setTableType(metaClient.getTableType())
-        .setTableName(metaClient.getTableConfig().getTableName())
-        .setArchiveLogFolder(metaClient.getArchivePath())
-        .setPayloadClassName(metaClient.getTableConfig().getPayloadClass());
+          .setTableName(metaClient.getTableConfig().getTableName())
+          .setArchiveLogFolder(metaClient.getArchivePath())
+          .setPayloadClassName(metaClient.getTableConfig().getPayloadClass());
     }
 
     public PropertyBuilder fromProperties(Properties properties) {
@@ -999,6 +1025,9 @@ public class HoodieTableMetaClient implements Serializable {
       }
       if (hoodieConfig.contains(HoodieTableConfig.TABLE_METADATA_PARTITIONS_INFLIGHT)) {
         setInflightMetadataPartitions(hoodieConfig.getString(HoodieTableConfig.TABLE_METADATA_PARTITIONS_INFLIGHT));
+      }
+      if (hoodieConfig.contains(HoodieTableConfig.SECONDARY_INDEXES_METADATA)) {
+        setSecondaryIndexesMetadata(hoodieConfig.getString(HoodieTableConfig.SECONDARY_INDEXES_METADATA));
       }
       return this;
     }
@@ -1095,6 +1124,9 @@ public class HoodieTableMetaClient implements Serializable {
       }
       if (null != inflightMetadataPartitions) {
         tableConfig.setValue(HoodieTableConfig.TABLE_METADATA_PARTITIONS_INFLIGHT, inflightMetadataPartitions);
+      }
+      if (null != secondaryIndexesMetadata) {
+        tableConfig.setValue(HoodieTableConfig.SECONDARY_INDEXES_METADATA, secondaryIndexesMetadata);
       }
       return tableConfig.getProps();
     }
