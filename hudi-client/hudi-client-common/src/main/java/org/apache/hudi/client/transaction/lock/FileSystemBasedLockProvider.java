@@ -29,7 +29,9 @@ import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.lock.LockProvider;
 import org.apache.hudi.common.lock.LockState;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.util.FileIOUtils;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -61,6 +63,7 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
   private final transient Path lockFile;
   protected LockConfiguration lockConfiguration;
   private String lockInfo;
+  private HoodieInstant ownerInstant;
 
   public FileSystemBasedLockProvider(final LockConfiguration lockConfiguration, final Configuration configuration) {
     checkRequiredProps(lockConfiguration);
@@ -87,7 +90,7 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
   }
 
   @Override
-  public boolean tryLock(long time, TimeUnit unit) {
+  public boolean tryLock(Option<HoodieInstant> ownerInstant, long time, TimeUnit unit) {
     try {
       synchronized (LOCK_FILE_NAME) {
         // Check whether lock is already expired, if so try to delete lock file
@@ -99,6 +102,9 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
             setLockInfo(readLockInfo());
             return false;
           }
+        }
+        if (ownerInstant.isPresent()) {
+          this.ownerInstant = ownerInstant.get();
         }
         acquireLock();
         return fs.exists(this.lockFile);
@@ -168,6 +174,9 @@ public class FileSystemBasedLockProvider implements LockProvider<String>, Serial
     StringBuilder sb = new StringBuilder();
     sb.append(String.format("LOCK-TIME : %s \n", System.currentTimeMillis()));
     sb.append(String.format("LOCK-THREAD : %s \n", Thread.currentThread().getName()));
+    if (this.ownerInstant != null) {
+      sb.append(String.format("OWNER-INSTANT : %s \n", this.ownerInstant));
+    }
     sb.append("LOCK-STACK-INFO : \n");
     StackTraceElement[] stack = Thread.currentThread().getStackTrace();
     for (StackTraceElement ste : stack) {

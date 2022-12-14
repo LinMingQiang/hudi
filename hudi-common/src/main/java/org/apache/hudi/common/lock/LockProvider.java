@@ -18,6 +18,10 @@
 
 package org.apache.hudi.common.lock;
 
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.Option;
+
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 
@@ -39,6 +43,15 @@ public interface LockProvider<T> extends Lock, AutoCloseable {
   @Override
   default boolean tryLock() {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  default boolean tryLock(long time, TimeUnit unit) {
+    throw new UnsupportedOperationException();
+  }
+
+  default boolean tryLock(Option<HoodieInstant> ownerInstant, long time, TimeUnit unit) throws InterruptedException {
+    return tryLock(time, unit);
   }
 
   @Override

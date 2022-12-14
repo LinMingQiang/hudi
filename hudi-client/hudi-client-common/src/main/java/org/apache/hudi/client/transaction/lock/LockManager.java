@@ -22,6 +22,8 @@ import org.apache.hudi.client.transaction.lock.metrics.HoodieLockMetrics;
 import org.apache.hudi.common.config.LockConfiguration;
 import org.apache.hudi.common.config.SerializableConfiguration;
 import org.apache.hudi.common.lock.LockProvider;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -62,7 +64,7 @@ public class LockManager implements Serializable, AutoCloseable {
     metrics = new HoodieLockMetrics(writeConfig);
   }
 
-  public void lock() {
+  public void lock(Option<HoodieInstant> newTxnOwnerInstant) {
     if (writeConfig.getWriteConcurrencyMode().supportsOptimisticConcurrencyControl()) {
       LockProvider lockProvider = getLockProvider();
       int retryCount = 0;
@@ -70,7 +72,7 @@ public class LockManager implements Serializable, AutoCloseable {
       while (retryCount <= maxRetries) {
         try {
           metrics.startLockApiTimerContext();
-          acquired = lockProvider.tryLock(writeConfig.getLockAcquireWaitTimeoutInMs(), TimeUnit.MILLISECONDS);
+          acquired = lockProvider.tryLock(newTxnOwnerInstant, writeConfig.getLockAcquireWaitTimeoutInMs(), TimeUnit.MILLISECONDS);
           if (acquired) {
             metrics.updateLockAcquiredMetric();
             break;
