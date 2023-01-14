@@ -18,7 +18,6 @@
 
 package org.apache.hudi.source;
 
-import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.BaseFile;
 import org.apache.hudi.common.model.FileSlice;
@@ -43,6 +42,7 @@ import org.apache.hudi.table.format.mor.MergeOnReadInputSplit;
 import org.apache.hudi.util.ClusteringUtil;
 import org.apache.hudi.util.StreamerUtil;
 
+import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.table.types.logical.RowType;
@@ -53,6 +53,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -65,8 +66,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import scala.Serializable;
 
 import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
 import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN_OR_EQUALS;
@@ -461,7 +460,7 @@ public class IncrementalInputSplits implements Serializable {
   }
 
   private HoodieTimeline getArchivedReadTimeline(HoodieTableMetaClient metaClient, String startInstant) {
-    HoodieArchivedTimeline archivedTimeline = metaClient.getArchivedTimeline(startInstant);
+    HoodieArchivedTimeline archivedTimeline = metaClient.getArchivedTimeline(startInstant, false);
     HoodieTimeline archivedCompleteTimeline = archivedTimeline.getCommitsTimeline().filterCompletedInstants();
     return filterInstantsByCondition(archivedCompleteTimeline);
   }
@@ -480,7 +479,7 @@ public class IncrementalInputSplits implements Serializable {
     HoodieTimeline completedTimeline = commitTimeline.filterCompletedInstants();
     if (issuedInstant != null) {
       // returns early for streaming mode
-      return commitTimeline
+      return completedTimeline
           .getInstantsAsStream()
           .filter(s -> HoodieTimeline.compareTimestamps(s.getTimestamp(), GREATER_THAN, issuedInstant))
           .collect(Collectors.toList());

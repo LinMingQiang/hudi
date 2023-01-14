@@ -64,6 +64,7 @@ import org.apache.hudi.utilities.transform.ChainedTransformer;
 import org.apache.hudi.utilities.transform.Transformer;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.spark.HoodieSparkKryoProvider$;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -227,7 +228,8 @@ public class UtilHelpers {
   public static TypedProperties buildProperties(List<String> props) {
     TypedProperties properties = DFSPropertiesConfiguration.getGlobalProps();
     props.forEach(x -> {
-      String[] kv = x.split("=");
+      // Some values may contain '=', such as the partition path
+      String[] kv = x.split("=", 2);
       ValidationUtils.checkArgument(kv.length == 2);
       properties.setProperty(kv[0], kv[1]);
     });
@@ -235,7 +237,7 @@ public class UtilHelpers {
   }
 
   public static void validateAndAddProperties(String[] configs, SparkLauncher sparkLauncher) {
-    Arrays.stream(configs).filter(config -> config.contains("=") && config.split("=").length == 2).forEach(sparkLauncher::addAppArgs);
+    Arrays.stream(configs).filter(config -> config.contains("=") && config.split("=", 2).length == 2).forEach(sparkLauncher::addAppArgs);
   }
 
   /**
@@ -280,7 +282,8 @@ public class UtilHelpers {
     sparkConf.set("spark.driver.allowMultipleContexts", "true");
 
     additionalConfigs.forEach(sparkConf::set);
-    return SparkRDDWriteClient.registerClasses(sparkConf);
+    HoodieSparkKryoProvider$.MODULE$.register(sparkConf);
+    return sparkConf;
   }
 
   private static SparkConf buildSparkConf(String appName, Map<String, String> additionalConfigs) {
@@ -294,7 +297,8 @@ public class UtilHelpers {
     sparkConf.set("spark.hadoop.mapred.output.compression.type", "BLOCK");
 
     additionalConfigs.forEach(sparkConf::set);
-    return SparkRDDWriteClient.registerClasses(sparkConf);
+    HoodieSparkKryoProvider$.MODULE$.register(sparkConf);
+    return sparkConf;
   }
 
   public static JavaSparkContext buildSparkContext(String appName, Map<String, String> configs) {

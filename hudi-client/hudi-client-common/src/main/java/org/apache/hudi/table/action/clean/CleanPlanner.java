@@ -30,7 +30,6 @@ import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieFileGroupId;
 import org.apache.hudi.common.model.HoodieLogFile;
-import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.cdc.HoodieCDCUtils;
@@ -74,7 +73,7 @@ import java.util.stream.Stream;
  * <p>
  * 2) It bounds the growth of the files in the file system
  */
-public class CleanPlanner<T extends HoodieRecordPayload, I, K, O> implements Serializable {
+public class CleanPlanner<T, I, K, O> implements Serializable {
 
   private static final Logger LOG = LogManager.getLogger(CleanPlanner.class);
 
@@ -488,7 +487,24 @@ public class CleanPlanner<T extends HoodieRecordPayload, I, K, O> implements Ser
     int hoursRetained = config.getCleanerHoursRetained();
     if (config.getCleanerPolicy() == HoodieCleaningPolicy.KEEP_LATEST_COMMITS
         && commitTimeline.countInstants() > commitsRetained) {
-      earliestCommitToRetain = commitTimeline.nthInstant(commitTimeline.countInstants() - commitsRetained); //15 instants total, 10 commits to retain, this gives 6th instant in the list
+      Option<HoodieInstant> earliestPendingCommits = hoodieTable.getMetaClient()
+          .getActiveTimeline()
+          .getCommitsTimeline()
+          .filter(s -> !s.isCompleted()).firstInstant();
+      if (earliestPendingCommits.isPresent()) {
+        // Earliest commit to retain must not be later than the earliest pending commit
+        earliestCommitToRetain =
+            commitTimeline.nthInstant(commitTimeline.countInstants() - commitsRetained).map(nthInstant -> {
+              if (nthInstant.compareTo(earliestPendingCommits.get()) <= 0) {
+                return Option.of(nthInstant);
+              } else {
+                return commitTimeline.findInstantsBefore(earliestPendingCommits.get().getTimestamp()).lastInstant();
+              }
+            }).orElse(Option.empty());
+      } else {
+        earliestCommitToRetain = commitTimeline.nthInstant(commitTimeline.countInstants()
+            - commitsRetained); //15 instants total, 10 commits to retain, this gives 6th instant in the list
+      }
     } else if (config.getCleanerPolicy() == HoodieCleaningPolicy.KEEP_LATEST_BY_HOURS) {
       Instant instant = Instant.now();
       ZonedDateTime currentDateTime = ZonedDateTime.ofInstant(instant, ZoneId.systemDefault());

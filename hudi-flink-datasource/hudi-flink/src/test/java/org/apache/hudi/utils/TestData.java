@@ -24,6 +24,7 @@ import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.BaseFile;
 import org.apache.hudi.common.model.FileSlice;
 import org.apache.hudi.common.model.HoodieAvroRecord;
+import org.apache.hudi.common.model.HoodieAvroRecordMerger;
 import org.apache.hudi.common.model.HoodieLogFile;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -31,6 +32,7 @@ import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.testutils.HoodieTestUtils;
+import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.configuration.FlinkOptions;
@@ -69,8 +71,10 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -556,6 +560,16 @@ public class TestData {
   }
 
   /**
+   * Assert that expected and actual collection of rows are equal regardless of the order.
+   *
+   * @param expected expected row collection
+   * @param actual actual row collection
+   */
+  public static void assertRowsEqualsUnordered(Collection<Row> expected, Collection<Row> actual) {
+    assertEquals(new HashSet<>(expected), new HashSet<>(actual));
+  }
+
+  /**
    * Checks the source data set are written as expected.
    *
    * <p>Note: Replace it with the Flink reader when it is supported.
@@ -806,9 +820,9 @@ public class TestData {
         if (scanner != null) {
           for (String curKey : scanner.getRecords().keySet()) {
             if (!keyToSkip.contains(curKey)) {
-              Option<GenericRecord> record = (Option<GenericRecord>) scanner.getRecords()
-                  .get(curKey).getData()
-                  .getInsertValue(schema, config.getProps());
+              Option<GenericRecord> record = (Option<GenericRecord>) ((HoodieAvroRecord) scanner.getRecords()
+                      .get(curKey)).getData()
+                      .getInsertValue(schema, config.getProps());
               if (record.isPresent()) {
                 readBuffer.add(filterOutVariables(record.get()));
               }
@@ -844,6 +858,7 @@ public class TestData {
         .withSpillableMapBasePath("/tmp/")
         .withDiskMapType(HoodieCommonConfig.SPILLABLE_DISK_MAP_TYPE.defaultValue())
         .withBitCaskDiskMapCompressionEnabled(HoodieCommonConfig.DISK_MAP_BITCASK_COMPRESSION_ENABLED.defaultValue())
+        .withRecordMerger(HoodieRecordUtils.loadRecordMerger(HoodieAvroRecordMerger.class.getName()))
         .build();
   }
 
@@ -904,5 +919,52 @@ public class TestData {
     BinaryRowData rowData = insertRow(fields);
     rowData.setRowKind(RowKind.UPDATE_AFTER);
     return rowData;
+  }
+
+  /**
+   * Creates row with specified field values.
+   * <p>This method is used to define row in convenient way such as:
+   *
+   * <pre> {@code
+   * row(1, array("abc1", "def1"), map("abc1", 1, "def1", 3), row(1, "abc1"))
+   * }</pre>
+   */
+  public static Row row(Object... values) {
+    return Row.of(values);
+  }
+
+  /**
+   * Creates array with specified values.
+   * <p>This method is used to define row in convenient way such as:
+   *
+   * <pre> {@code
+   * row(1, array("abc1", "def1"), map("abc1", 1, "def1", 3), row(1, "abc1"))
+   * }</pre>
+   */
+  @SafeVarargs
+  public static <T> T[] array(T... values) {
+    return values;
+  }
+
+  /**
+   * Creates map with specified keys and values.
+   * <p>This method is used to define row in convenient way such as:
+   *
+   * <pre> {@code
+   * row(1, array("abc1", "def1"), map("abc1", 1, "def1", 3), row(1, "abc1"))
+   * }</pre>
+   *
+   * <p>NOTE: be careful of the order of keys and values. If you make
+   * a mistake, {@link ClassCastException} will occur later than the
+   * creation of the map due to type erasure.
+   */
+  public static <K, V> Map<K, V> map(Object... kwargs) {
+    HashMap<Object, Object> map = new HashMap<>();
+    for (int i = 0; i < kwargs.length; i += 2) {
+      map.put(kwargs[i], kwargs[i + 1]);
+    }
+    @SuppressWarnings("unchecked")
+    Map<K, V> resultMap = (Map<K, V>) map;
+    return resultMap;
   }
 }

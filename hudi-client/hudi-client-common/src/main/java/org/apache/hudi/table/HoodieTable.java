@@ -43,7 +43,6 @@ import org.apache.hudi.common.fs.FailSafeConsistencyGuard;
 import org.apache.hudi.common.fs.OptimisticConsistencyGuard;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieKey;
-import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableConfig;
@@ -115,7 +114,7 @@ import static org.apache.hudi.metadata.HoodieTableMetadataUtil.metadataPartition
  * @param <K> Type of keys
  * @param <O> Type of outputs
  */
-public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implements Serializable {
+public abstract class HoodieTable<T, I, K, O> implements Serializable {
 
   private static final Logger LOG = LogManager.getLogger(HoodieTable.class);
 
@@ -561,15 +560,15 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
    * that would cause any running queries that are accessing file slices written after the instant to fail.
    */
   public abstract HoodieRestoreMetadata restore(HoodieEngineContext context,
-                                                String restoreInstantTime,
-                                                String instantToRestore);
+                                                String restoreInstantTimestamp,
+                                                String savepointToRestoreTimestamp);
 
   /**
    * Schedules Restore for the table to the given instant.
    */
   public abstract Option<HoodieRestorePlan> scheduleRestore(HoodieEngineContext context,
-                                                    String restoreInstantTime,
-                                                    String instantToRestore);
+                                                    String restoreInstantTimestamp,
+                                                    String savepointToRestoreTimestamp);
 
   public void rollbackInflightCompaction(HoodieInstant inflightInstant) {
     rollbackInflightCompaction(inflightInstant, s -> Option.empty());

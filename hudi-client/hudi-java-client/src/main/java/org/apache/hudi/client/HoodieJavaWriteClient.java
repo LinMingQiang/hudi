@@ -25,7 +25,6 @@ import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -49,7 +48,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
-public class HoodieJavaWriteClient<T extends HoodieRecordPayload> extends
+public class HoodieJavaWriteClient<T> extends
     BaseHoodieWriteClient<T, List<HoodieRecord<T>>, List<HoodieKey>, List<WriteStatus>> {
 
   public HoodieJavaWriteClient(HoodieEngineContext context, HoodieWriteConfig clientConfig) {
@@ -93,6 +92,11 @@ public class HoodieJavaWriteClient<T extends HoodieRecordPayload> extends
   @Override
   protected HoodieTable createTable(HoodieWriteConfig config, Configuration hadoopConf) {
     return HoodieJavaTable.create(config, context);
+  }
+
+  @Override
+  protected HoodieTable createTable(HoodieWriteConfig config, Configuration hadoopConf, HoodieTableMetaClient metaClient) {
+    return HoodieJavaTable.create(config, context, metaClient);
   }
 
   @Override
@@ -231,13 +235,4 @@ public class HoodieJavaWriteClient<T extends HoodieRecordPayload> extends
   public HoodieWriteMetadata<List<WriteStatus>> cluster(final String clusteringInstant, final boolean shouldComplete) {
     throw new HoodieNotSupportedException("Cluster is not supported in HoodieJavaClient");
   }
-
-  @Override
-  protected HoodieTable doInitTable(HoodieTableMetaClient metaClient, Option<String> instantTime, boolean initialMetadataTableIfNecessary) {
-    // new JavaUpgradeDowngrade(metaClient, config, context).run(metaClient, HoodieTableVersion.current(), config, context, instantTime);
-
-    // Create a Hoodie table which encapsulated the commits and files visible
-    return HoodieJavaTable.create(config, (HoodieJavaEngineContext) context, metaClient);
-  }
-
 }
