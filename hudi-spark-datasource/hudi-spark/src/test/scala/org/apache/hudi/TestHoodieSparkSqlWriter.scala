@@ -30,6 +30,7 @@ import org.apache.hudi.config.{HoodieBootstrapConfig, HoodieIndexConfig, HoodieW
 import org.apache.hudi.exception.{HoodieException, SchemaCompatibilityException}
 import org.apache.hudi.execution.bulkinsert.BulkInsertSortMode
 import org.apache.hudi.functional.TestBootstrap
+import org.apache.hudi.hive.HiveSyncConfigHolder
 import org.apache.hudi.keygen.{ComplexKeyGenerator, NonpartitionedKeyGenerator, SimpleKeyGenerator}
 import org.apache.hudi.testutils.DataSourceTestUtils
 import org.apache.hudi.testutils.HoodieClientTestUtils.getSparkConfForTest
@@ -49,7 +50,6 @@ import org.mockito.Mockito.{spy, times, verify}
 import org.scalatest.Assertions.assertThrows
 import org.scalatest.Matchers.{be, convertToAnyShouldWrapper, intercept}
 
-import java.io.IOException
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField
 import java.time.{Instant, ZoneId}
@@ -1336,6 +1336,77 @@ class TestHoodieSparkSqlWriter {
     } finally {
       TimeZone.setDefault(defaultTimezone)
     }
+  }
+
+  /**
+   * Test case for spark catalog refresh table.
+   */
+  @Test
+  def testMergeOnReadCatalogRefreshTable(): Unit = {
+    val _spark = spark
+    import _spark.implicits._
+    val df = Seq((1, "a1", 10, 1000L, "2021-10-16")).toDF("id", "name", "value", "ts", "dt")
+    val df2 = Seq((2, "a2", 20, 2000L, "2021-10-17")).toDF("id", "name", "value", "ts", "dt")
+    val options = Map(
+      DataSourceWriteOptions.TABLE_TYPE.key -> MOR_TABLE_TYPE_OPT_VAL,
+      DataSourceWriteOptions.RECORDKEY_FIELD.key -> "id",
+      DataSourceWriteOptions.PRECOMBINE_FIELD.key -> "ts",
+      HiveSyncConfigHolder.HIVE_SYNC_ENABLED.key -> "true",
+      DataSourceWriteOptions.PARTITIONPATH_FIELD.key -> "dt"
+    )
+    val (tableName1, tablePath1) = ("hoodie_test_refresh", tempBasePath)
+    spark.sql(
+      s"""
+         | create table $tableName1 (
+         |   id int,
+         |   name string,
+         |   value int,
+         |   ts long,
+         |   dt string
+         | ) using hudi
+         | partitioned by (dt)
+         | options (
+         |  primaryKey = 'id',
+         |  preCombineField = 'ts',
+         |  type = 'mor'
+         | )
+         | location '$tablePath1'
+       """.stripMargin)
+    val roTableName1 = tableName1 + "_ro"
+    spark.sql(s"""
+         |create table $roTableName1
+         |using hudi
+         |tblproperties (
+         | 'hoodie.query.as.ro.table' = 'true'
+         |)
+         |location '$tablePath1'
+         |""".stripMargin)
+
+    val rtTableName2 = tableName1 + "_rt"
+    spark.sql(s"""
+         |create table $rtTableName2
+         |using hudi
+         |tblproperties (
+         | 'hoodie.query.as.ro.table' = 'false'
+         |)
+         |location '$tablePath1'
+         |""".stripMargin)
+    df.write.format("hudi")
+      .options(options)
+      .option(HoodieWriteConfig.TBL_NAME.key, tableName1)
+      .mode(SaveMode.Append).save(tablePath1)
+    assert(spark.sql(s"select id from $tableName1").count() == 1)
+    assert(spark.sql(s"select id from $roTableName1").count() == 1)
+    assert(spark.sql(s"select id from $rtTableName2").count() == 1)
+
+    df2.write.format("hudi")
+      .options(options)
+      .option(HoodieWriteConfig.TBL_NAME.key, tableName1)
+      .mode(SaveMode.Append).save(tablePath1)
+
+    // If we don't refresh spark catalog, we can't get the latest data.
+    assert(spark.sql(s"select id from $roTableName1").count() == 2)
+    assert(spark.sql(s"select id from $rtTableName2").count() == 2)
   }
 
   private def fetchActualSchema(): Schema = {
